@@ -54,7 +54,7 @@ jobs:
       - name: Verify Docker health
         run: |
           if [ "$(docker inspect --format '{{.State.Health.Status}}' api)" != healthy ]; then
-            timeout 120s docker events --since "$(docker inspect --format '{{.Created}}' api)" --filter container=api --filter event=health_status --format '{{.Status}}' | grep -m1 'health_status: healthy' || true
+            timeout 120s docker events --since "$(docker inspect --format '{{.Created}}' api)" --filter container=api --filter event=health_status --format '{{.Action}}' | grep -m1 'health_status: healthy' || true
           fi
           test "$(docker inspect --format '{{.State.Health.Status}}' api)" = healthy
           docker ps --filter name=api
