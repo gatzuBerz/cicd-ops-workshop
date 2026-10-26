@@ -39,7 +39,7 @@ jobs:
       - name: Pull the image
         run: docker pull "$IMAGE"
       - name: Train
-        run: docker run --rm -v ./model:/app/model "$IMAGE"
+        run: docker run --rm "$IMAGE"
       # Keep the trained model, so you can download it from the run's page.
       - uses: actions/upload-artifact@v7
         with:
