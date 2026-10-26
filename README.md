@@ -74,7 +74,7 @@ The intentional failures were reproduced locally, then reverted:
 ### Exercise 3
 
 - `GET /health` returns `{"status": "ok"}` and has an API test. **Deploy** retries that endpoint before sending predictions.
-- **Deploy** requires an explicit numeric `model_run_id` when launched, rather than implicitly deploying `latest`. Copy the ID from a successful training run with a `model` artifact.
+- **Deploy** pins `MODEL_RUN_ID` in Git to training run `40336508685`, rather than implicitly deploying `latest`. Change the quoted ID in the workflow to deploy another successful run with a `model` artifact.
 - The deployment container downloads the selected model at startup, not during the image build. Its logs report the source run ID.
 - A newer training run does not change an explicitly selected run ID. Once its artifact expires, a new deployment using that ID cannot download the model.
 - The training image runs training; `deployment.Dockerfile` runs the API. `/health` is a machine-facing endpoint, unlike the human-facing `/docs` page.
