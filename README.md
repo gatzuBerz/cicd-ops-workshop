@@ -83,9 +83,9 @@ The intentional failures were reproduced locally and on separate GitHub branches
 - A newer training run does not change an explicitly selected run ID. Once its artifact expires, a new deployment using that ID cannot download the model.
 - The training image runs training; `deployment.Dockerfile` runs the API. `/health` is a machine-facing endpoint, unlike the human-facing `/docs` page.
 
-Local validation passes formatting, lint, all five tests, and GitHub Actions workflow validation. A local pre-push hook now runs the tests before publishing changes.
+Local validation passes formatting, lint, all six tests, and GitHub Actions workflow validation. A local pre-push hook now runs the tests before publishing changes.
 
-Hosted validation was launched explicitly with `workflow_dispatch`:
+Initial hosted validation was launched explicitly with `workflow_dispatch`; the final audit also verifies actual push-triggered runs:
 
 - [CI: lint, tests, and training passed](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40336508685).
 - [Docker: image publishing and container training passed](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40337071708), with accuracy `1.0000`.
@@ -107,7 +107,7 @@ Scope: all required tasks and all explicitly optional extensions, as requested. 
 | Exercise 2 Task 1: inspect unrestricted image, then restrict it | Done; [original image includes Git history, tests, and docs](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40346796055); [corrected image contains only requirements and source](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40337071708). |
 | Exercise 2 Task 2: registry login and commit/branch tags across builds | Done; [first image](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40336529771) and [second image](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40337071708) publish SHA tags and move `main`. |
 | Exercise 2 Task 3: manual image training, older image, downloaded artifact | Done; [older SHA-tagged image trains successfully](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40336995818); artifact downloaded locally. |
-| Exercise 2 Task 3: build then train automatically after a push | Partial: the linked jobs [pass when dispatched](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40346584678), but push events did not start workflows during this session. The push trigger is configured, not verified. |
+| Exercise 2 Task 3: build then train automatically after a push | Done; the actual [source-changing main push builds, trains, and deploys](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40349959592). |
 | Exercise 2 question: what happens without the volume mount? | Demonstrated; [training loses its output and artifact upload fails](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40348599125). The [original unfinished training workflow](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40346812224) is also visible before the fix. |
 | Exercise 3 Task 1: initial latest-model deployment | Done; [original deployment downloads a model at startup and waits on docs](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40347000066). |
 | Exercise 3 Task 2: pin model and redeploy after newer training | Done; [repeat deployment still selects run 40336508685](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40337317017). |
@@ -122,11 +122,11 @@ Scope: all required tasks and all explicitly optional extensions, as requested. 
 | Compare model quality against a baseline | Done; default model passes; [baseline-only branch fails the required five-percentage-point margin](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40347670024). |
 | Test Python 3.12, 3.13, and 3.14 | Done; [all three matrix jobs pass](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40346567680). |
 | Compare cached and uncached CI | Done; [uncached](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40347026697) Python 3.12 job: 10 seconds; [cached](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40347043685): 13 seconds. Dependency sync took 1 second in both; cache restores are visible, but this measurement shows no speedup. |
-| Train only for main-branch source changes | Implemented with a source-path filter and branch condition. Actual source-changing and documentation-only push behavior remains unverified because push events did not start runs. |
+| Train only for main-branch source changes | Done; the actual [source-changing push trains and deploys](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40349959592), while the [documentation-only push skips training and deployment](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40349204301). |
 | Label image with its commit | Done; [build log](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40346584678) shows revision `212d88eb7e1bbd451e2b3ab88c8bdf27a4cae0fb`. Label placement after dependency installation avoids invalidating that expensive layer. |
 | Let Docker check container health | Done; [deployment log](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40346584678) shows `docker ps` reporting `(healthy)`. |
-| Deploy exactly the model just trained | Linked build -> train -> deploy passes; [deployment downloads model run 40346584678 from that same run](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40346584678). Its automatic push entry point remains unverified. |
-| Run the serving container locally | Blocked: no Docker executable or usable WSL distribution was found. Hosted container tests do not replace this local-container requirement. Docker installation is a machine prerequisite, not completed by this audit. |
+| Deploy exactly the model just trained | Done on an actual push; [build -> train -> deploy](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40349959592) passes its own run ID to deployment, selecting that run's model artifact. |
+| Run the serving container locally | Blocked: no Docker executable or usable WSL distribution was found. Hosted container tests do not replace this local-container requirement. A native API preview is available at `http://127.0.0.1:8765/docs`; health and setosa prediction were checked. This preview is not a container. |
 
 ### Answers and verification limits
 
@@ -137,5 +137,5 @@ Scope: all required tasks and all explicitly optional extensions, as requested. 
 - Readiness retries allow model download and server startup. Health checks are a small machine-facing contract; docs are a human-facing page that can be disabled.
 - A pinned model selection is unchanged by later training; `latest` can select a different model. Artifact retention is 30 days: new starts fail after expiration, while an already-running process keeps its loaded model. No artifacts were deleted to simulate expiration.
 - Lint checks style and likely mistakes; accuracy and baseline tests check behavior. Training can complete without meeting either quality gate. Pre-push tests help prevent broken code from leaving the machine; branch protection is an additional repository policy, not enabled by this audit.
-- GitHub Actions is enabled and manual runs work. Multiple actual pushes, including one with explicitly selected personal CLI authentication, produced no push-triggered runs. This remains an external verification gap; manual dispatch was not presented as proof of push-triggered behavior.
+- GitHub Actions is enabled. Push-triggered runs were initially absent from the inspected history, but were subsequently verified explicitly: [source change runs the full pipeline](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40349959592); [documentation-only changes skip training and deployment](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40349204301). Manual dispatch was not used as a substitute for this proof.
 - GitLab-specific instructions are alternatives, not additional requirements for this GitHub fork.
