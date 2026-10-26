@@ -66,24 +66,24 @@ The intentional failures were reproduced locally and on separate GitHub branches
 - GitHub's `lint` and `test` jobs are independent because neither declares `needs`.
 - One tree with depth one trains successfully with accuracy `0.7000`, but fails the test's `0.80` quality threshold.
 - `TEST_SIZE = 0` raises `InvalidParameterError` at `train_test_split` in `load_data`, before training.
-- The final settings remain `N_ESTIMATORS = 10`, `MAX_DEPTH = None`, and `TEST_SIZE = 0.2`.
+- Default settings remain `N_ESTIMATORS = 10`, `MAX_DEPTH = None`, and `TEST_SIZE = 0.2`. The optional extension reads the first two settings from environment variables.
 
 ### Exercise 2
 
 - `.dockerignore` allows only `requirements.txt` and `src/` into the image, excluding Python caches.
-- **Docker** publishes commit-SHA and branch tags to GHCR, then calls **Train (Docker)** with the exact commit tag.
+- **Docker** publishes commit-SHA and branch tags to GHCR. Manual main-branch runs train with the exact commit tag. Push-triggered training is configured for source changes on `main` only.
 - The branch tag moves with each build; the SHA tag identifies a specific commit. Branch-name slashes are replaced with hyphens for Docker tags.
 - Training mounts `./model` at `/app/model` and uploads it as the `model` artifact for 30 days. Without the mount, removing the container also removes its model.
 
 ### Exercise 3
 
 - `GET /health` returns `{"status": "ok"}` and has an API test. **Deploy** retries that endpoint before sending predictions.
-- **Deploy** pins `MODEL_RUN_ID` in Git to training run `40336508685`, rather than implicitly deploying `latest`. Change the quoted ID in the workflow to deploy another successful run with a `model` artifact.
+- Manual **Deploy** defaults to training run `40336508685`, recorded in Git, rather than implicitly deploying `latest`. Its input can select another run or explicitly compare `latest`. The optional linked pipeline passes its own run ID instead.
 - The deployment container downloads the selected model at startup, not during the image build. Its logs report the source run ID.
 - A newer training run does not change an explicitly selected run ID. Once its artifact expires, a new deployment using that ID cannot download the model.
 - The training image runs training; `deployment.Dockerfile` runs the API. `/health` is a machine-facing endpoint, unlike the human-facing `/docs` page.
 
-Local validation passes formatting, lint, all four tests, and GitHub Actions workflow validation.
+Local validation passes formatting, lint, all five tests, and GitHub Actions workflow validation. A local pre-push hook now runs the tests before publishing changes.
 
 Hosted validation was launched explicitly with `workflow_dispatch`:
 
@@ -93,3 +93,49 @@ Hosted validation was launched explicitly with `workflow_dispatch`:
 - [Deploy: pinned model download, health check, and both predictions passed](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40336919485).
 
 The downloaded container-trained model is in the ignored local directory `model/artifacts/40336529771/`. Deployment here is a smoke test on a temporary GitHub runner, not a persistent public API.
+
+## Task-by-task completion audit
+
+Scope: all required tasks and all explicitly optional extensions, as requested. Expected red runs are isolated on demonstration branches; `main` keeps the working implementation.
+
+| Requirement | Result and evidence |
+| --- | --- |
+| Setup: fork, clone, dependencies, enabled Actions, green baseline | Done; native fork and [successful baseline CI](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40336508685). |
+| Exercise 1 Tasks 1-2: lint failure and independent tests | Done; [lint fails while tests and training pass](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40339670104). |
+| Exercise 1 Task 3: weak model, failed quality gate, successful training | Done; [training reports 70%, tests reject it](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40339904462). |
+| Exercise 1 Task 4: invalid test split and restoration | Done; [invalid split fails on GitHub](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40340088149); main retains the valid split. |
+| Exercise 2 Task 1: inspect unrestricted image, then restrict it | Done; [original image includes Git history, tests, and docs](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40346796055); [corrected image contains only requirements and source](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40337071708). |
+| Exercise 2 Task 2: registry login and commit/branch tags across builds | Done; [first image](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40336529771) and [second image](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40337071708) publish SHA tags and move `main`. |
+| Exercise 2 Task 3: manual image training, older image, downloaded artifact | Done; [older SHA-tagged image trains successfully](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40336995818); artifact downloaded locally. |
+| Exercise 2 Task 3: build then train automatically after a push | Partial: the linked jobs [pass when dispatched](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40346584678), but push events did not start workflows during this session. The push trigger is configured, not verified. |
+| Exercise 2 question: what happens without the volume mount? | Demonstrated; [training loses its output and artifact upload fails](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40348599125). The [original unfinished training workflow](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40346812224) is also visible before the fix. |
+| Exercise 3 Task 1: initial latest-model deployment | Done; [original deployment downloads a model at startup and waits on docs](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40347000066). |
+| Exercise 3 Task 2: pin model and redeploy after newer training | Done; [repeat deployment still selects run 40336508685](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40337317017). |
+| Exercise 3 Task 3: tested health endpoint and container readiness | Done; API tests and [container deployment](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40346584678) check health and predictions. |
+
+### Optional extensions
+
+| Extension | Result and evidence |
+| --- | --- |
+| Run tests before pushing | Done locally: installed `pre-push`; a real push of `extension-pre-push-blocked` failed before publication because `TEST_SIZE = 0`. Intentional hosted failures explicitly skip this hook only for their demonstration push. |
+| Select training settings when launching CI | Done; [manual inputs produce 70% without a source edit](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40347043685). Inputs affect the training job; tests independently validate the default model. |
+| Compare model quality against a baseline | Done; default model passes; [baseline-only branch fails the required five-percentage-point margin](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40347670024). |
+| Test Python 3.12, 3.13, and 3.14 | Done; [all three matrix jobs pass](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40346567680). |
+| Compare cached and uncached CI | Done; [uncached](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40347026697) Python 3.12 job: 10 seconds; [cached](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40347043685): 13 seconds. Dependency sync took 1 second in both; cache restores are visible, but this measurement shows no speedup. |
+| Train only for main-branch source changes | Implemented with a source-path filter and branch condition. Actual source-changing and documentation-only push behavior remains unverified because push events did not start runs. |
+| Label image with its commit | Done; [build log](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40346584678) shows revision `212d88eb7e1bbd451e2b3ab88c8bdf27a4cae0fb`. Label placement after dependency installation avoids invalidating that expensive layer. |
+| Let Docker check container health | Done; [deployment log](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40346584678) shows `docker ps` reporting `(healthy)`. |
+| Deploy exactly the model just trained | Linked build -> train -> deploy passes; [deployment downloads model run 40346584678 from that same run](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40346584678). Its automatic push entry point remains unverified. |
+| Run the serving container locally | Blocked: no Docker executable or usable WSL distribution was found. Hosted container tests do not replace this local-container requirement. Docker installation is a machine prerequisite, not completed by this audit. |
+
+### Answers and verification limits
+
+- Full commit SHAs are on GitHub commit pages or available with `git rev-parse HEAD`. A branch tag tracks the newest published branch image; a SHA tag identifies a particular commit's image. Use a digest for strict image immutability.
+- Omitting `-v` writes the model only inside the container; `--rm` then deletes it. A separate image-pull step makes its timing visible.
+- The training and deployment images perform different jobs. Both install the same dependency versions so saved models remain compatible.
+- Startup logs identify the selected model run. Startup downloads keep model versions and credentials out of the built image, but require GitHub availability when starting a container.
+- Readiness retries allow model download and server startup. Health checks are a small machine-facing contract; docs are a human-facing page that can be disabled.
+- A pinned model selection is unchanged by later training; `latest` can select a different model. Artifact retention is 30 days: new starts fail after expiration, while an already-running process keeps its loaded model. No artifacts were deleted to simulate expiration.
+- Lint checks style and likely mistakes; accuracy and baseline tests check behavior. Training can complete without meeting either quality gate. Pre-push tests help prevent broken code from leaving the machine; branch protection is an additional repository policy, not enabled by this audit.
+- GitHub Actions is enabled and manual runs work. Multiple actual pushes, including one with explicitly selected personal CLI authentication, produced no push-triggered runs. This remains an external verification gap; manual dispatch was not presented as proof of push-triggered behavior.
+- GitLab-specific instructions are alternatives, not additional requirements for this GitHub fork.
