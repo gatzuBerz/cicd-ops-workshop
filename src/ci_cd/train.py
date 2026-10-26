@@ -4,7 +4,7 @@ import pathlib
 
 import joblib
 from sklearn.datasets import load_iris
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.dummy import DummyClassifier
 from sklearn.metrics import accuracy_score, confusion_matrix
 from sklearn.model_selection import train_test_split
 
@@ -33,9 +33,7 @@ def train() -> dict:
         f"Training RandomForestClassifier with N_ESTIMATORS={N_ESTIMATORS} and MAX_DEPTH={MAX_DEPTH}"
     )
 
-    clf = RandomForestClassifier(
-        n_estimators=N_ESTIMATORS, max_depth=MAX_DEPTH, random_state=RANDOM_STATE
-    )
+    clf = DummyClassifier(strategy="most_frequent")
     clf.fit(X_train, y_train)
 
     y_pred = clf.predict(X_test)
