@@ -79,4 +79,13 @@ The intentional failures were reproduced locally, then reverted:
 - A newer training run does not change an explicitly selected run ID. Once its artifact expires, a new deployment using that ID cannot download the model.
 - The training image runs training; `deployment.Dockerfile` runs the API. `/health` is a machine-facing endpoint, unlike the human-facing `/docs` page.
 
-Local validation passes formatting, lint, all four tests, and GitHub Actions workflow validation. Registry publishing and container deployment require successful workflow runs in the fork; local checks alone do not verify them.
+Local validation passes formatting, lint, all four tests, and GitHub Actions workflow validation.
+
+Hosted validation was launched explicitly with `workflow_dispatch`:
+
+- [CI: lint, tests, and training passed](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40336508685).
+- [Docker: image publishing and container training passed](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40337071708), with accuracy `1.0000`.
+- [Manual training with an older commit-tagged image passed](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40336995818).
+- [Deploy: pinned model download, health check, and both predictions passed](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40336919485).
+
+The downloaded container-trained model is in the ignored local directory `model/artifacts/40336529771/`. Deployment here is a smoke test on a temporary GitHub runner, not a persistent public API.
