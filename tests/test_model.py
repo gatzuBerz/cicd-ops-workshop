@@ -1,3 +1,6 @@
+import subprocess
+import sys
+
 from sklearn.dummy import DummyClassifier
 from sklearn.metrics import accuracy_score
 
@@ -32,3 +35,16 @@ def test_model_beats_baseline():
         f"Model accuracy {model_accuracy:.2f} must beat baseline "
         f"{baseline_accuracy:.2f} by at least {MIN_BASELINE_MARGIN:.2f}"
     )
+
+
+def test_training_settings_from_environment(monkeypatch, tmp_path):
+    monkeypatch.setenv("N_ESTIMATORS", "3")
+    monkeypatch.setenv("MAX_DEPTH", " None ")
+    result = subprocess.run(
+        [sys.executable, "-m", "ci_cd.train"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert "N_ESTIMATORS=3 and MAX_DEPTH=None" in result.stdout
