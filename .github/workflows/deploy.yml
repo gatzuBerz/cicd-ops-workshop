@@ -5,6 +5,16 @@ name: Deploy
 # Run when you press the `Run workflow` button.
 on:
   workflow_dispatch:
+    inputs:
+      model_run_id:
+        description: Training run ID, or latest for comparison
+        type: string
+        default: "40336508685"
+  workflow_call:
+    inputs:
+      model_run_id:
+        required: true
+        type: string
 
 # Allow the job to download the model from the artifacts of the training runs.
 permissions:
@@ -15,11 +25,11 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      MODEL_RUN_ID: "40336508685"
+      MODEL_RUN_ID: ${{ inputs.model_run_id }}
     steps:
       - uses: actions/checkout@v7
       - name: Validate the model run ID
-        run: '[[ "$MODEL_RUN_ID" =~ ^[0-9]+$ ]]'
+        run: '[[ "$MODEL_RUN_ID" == latest || "$MODEL_RUN_ID" =~ ^[0-9]+$ ]]'
       - name: Build the image
         run: docker build -f deployment.Dockerfile -t iris-api .
       # The container downloads the model when it starts, with the job's token.
@@ -41,6 +51,13 @@ jobs:
           }
           predict setosa '{"sepal_length": 5.1, "sepal_width": 3.5, "petal_length": 1.4, "petal_width": 0.2}'
           predict virginica '{"sepal_length": 6.3, "sepal_width": 3.3, "petal_length": 6.0, "petal_width": 2.5}'
+      - name: Verify Docker health
+        run: |
+          if [ "$(docker inspect --format '{{.State.Health.Status}}' api)" != healthy ]; then
+            timeout 120s docker events --since "$(docker inspect --format '{{.Created}}' api)" --filter container=api --filter event=health_status --format '{{.Status}}' | grep -m1 'health_status: healthy' || true
+          fi
+          test "$(docker inspect --format '{{.State.Health.Status}}' api)" = healthy
+          docker ps --filter name=api
       # Show what the container printed, also when a step above failed.
       - name: Show the container logs
         if: always()

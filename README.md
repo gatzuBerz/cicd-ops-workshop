@@ -56,7 +56,11 @@ To see the pipelines/workflows made by this repository:
 
 ### Exercise 1
 
-The intentional failures were reproduced locally, then reverted:
+The intentional failures were reproduced locally and on separate GitHub branches; `main` retains the corrected settings:
+
+- [Tasks 1-2: unused import fails lint while tests and training pass](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40339670104).
+- [Task 3: training reports 70% accuracy and the quality test fails](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40339904462).
+- [Task 4: an empty test split fails tests and training](https://github.com/gatzuBerz/cicd-ops-workshop/actions/runs/40340088149).
 
 - An unused `import os` fails lint with `F401`. Removing it restores lint.
 - GitHub's `lint` and `test` jobs are independent because neither declares `needs`.

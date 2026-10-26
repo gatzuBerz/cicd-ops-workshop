@@ -7,6 +7,19 @@ on:
   push:
     branches: ["**"]
   workflow_dispatch:
+    inputs:
+      n_estimators:
+        description: Number of trees for manual training
+        type: string
+        default: "10"
+      max_depth:
+        description: Maximum tree depth, or None
+        type: string
+        default: "None"
+      enable_cache:
+        description: Reuse the uv dependency cache
+        type: boolean
+        default: true
 
 # Jobs run in parallel, unless a job lists another one under `needs`.
 jobs:
@@ -16,6 +29,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          python-version: "3.12"
+          enable-cache: ${{ github.event_name != 'workflow_dispatch' || inputs.enable_cache }}
       - run: uv sync --locked
       - run: uv run ruff format --check .
       - run: uv run ruff check .
@@ -23,19 +39,32 @@ jobs:
   # Run the tests.
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.3.2
-      - run: uv sync --locked
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: ${{ github.event_name != 'workflow_dispatch' || inputs.enable_cache }}
+      - run: uv sync --locked --python ${{ matrix.python-version }}
       - run: uv run pytest tests/ -v
 
   # Train the model. Only runs when you press the `run workflow` button.
   train:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    env:
+      N_ESTIMATORS: ${{ inputs.n_estimators }}
+      MAX_DEPTH: ${{ inputs.max_depth }}
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.3.2
+        with:
+          python-version: "3.12"
+          enable-cache: ${{ inputs.enable_cache }}
       - run: uv sync --locked
       - run: uv run python -m ci_cd.train
       # Keep the trained model, so you can download it from the run's page.

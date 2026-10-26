@@ -12,18 +12,29 @@ on:
 permissions:
   contents: read
   packages: write
+  actions: read
 
 jobs:
   # Build the image from the `Dockerfile`.
   build:
     runs-on: ubuntu-latest
+    outputs:
+      source_changed: ${{ steps.changes.outputs.src }}
     steps:
       - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            src:
+              - 'src/**'
       # Image names on GHCR must be lowercase.
       - name: Set the image name
         run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
       - name: Build the image
-        run: docker build -t "$IMAGE:$GITHUB_SHA" .
+        run: docker build --build-arg GIT_COMMIT="$GITHUB_SHA" -t "$IMAGE:$GITHUB_SHA" .
+      - name: Show the image revision
+        run: docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$IMAGE:$GITHUB_SHA"
       # List what `COPY . .` put in the image. The contents of `.git` and `__pycache__` are hidden.
       - name: Show the files in the image
         run: docker run --rm "$IMAGE:$GITHUB_SHA" find . \( -name .git -o -name __pycache__ \) -prune -print -o -print
@@ -40,6 +51,13 @@ jobs:
 
   train:
     needs: build
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || needs.build.outputs.source_changed == 'true')
     uses: ./.github/workflows/train-docker.yml
     with:
       image_tag: ${{ github.sha }}
+
+  deploy:
+    needs: train
+    uses: ./.github/workflows/deploy.yml
+    with:
+      model_run_id: ${{ github.run_id }}
