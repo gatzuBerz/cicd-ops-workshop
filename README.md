@@ -51,3 +51,32 @@ To see the pipelines/workflows made by this repository:
 
 - **GitLab**: in your project, go to **Build -> Pipelines**.
 - **GitHub**: in your repository, open the **Actions** tab.
+
+## Exercise implementation and observations
+
+### Exercise 1
+
+The intentional failures were reproduced locally, then reverted:
+
+- An unused `import os` fails lint with `F401`. Removing it restores lint.
+- GitHub's `lint` and `test` jobs are independent because neither declares `needs`.
+- One tree with depth one trains successfully with accuracy `0.7000`, but fails the test's `0.80` quality threshold.
+- `TEST_SIZE = 0` raises `InvalidParameterError` at `train_test_split` in `load_data`, before training.
+- The final settings remain `N_ESTIMATORS = 10`, `MAX_DEPTH = None`, and `TEST_SIZE = 0.2`.
+
+### Exercise 2
+
+- `.dockerignore` allows only `requirements.txt` and `src/` into the image, excluding Python caches.
+- **Docker** publishes commit-SHA and branch tags to GHCR, then calls **Train (Docker)** with the exact commit tag.
+- The branch tag moves with each build; the SHA tag identifies a specific commit. Branch-name slashes are replaced with hyphens for Docker tags.
+- Training mounts `./model` at `/app/model` and uploads it as the `model` artifact for 30 days. Without the mount, removing the container also removes its model.
+
+### Exercise 3
+
+- `GET /health` returns `{"status": "ok"}` and has an API test. **Deploy** retries that endpoint before sending predictions.
+- **Deploy** requires an explicit numeric `model_run_id` when launched, rather than implicitly deploying `latest`. Copy the ID from a successful training run with a `model` artifact.
+- The deployment container downloads the selected model at startup, not during the image build. Its logs report the source run ID.
+- A newer training run does not change an explicitly selected run ID. Once its artifact expires, a new deployment using that ID cannot download the model.
+- The training image runs training; `deployment.Dockerfile` runs the API. `/health` is a machine-facing endpoint, unlike the human-facing `/docs` page.
+
+Local validation passes formatting, lint, all four tests, and GitHub Actions workflow validation. Registry publishing and container deployment require successful workflow runs in the fork; local checks alone do not verify them.

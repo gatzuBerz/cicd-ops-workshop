@@ -20,6 +20,12 @@ def client():
         yield client
 
 
+def test_health(client):
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
 def test_predict(client):
     response = client.post("/predict", json=SETOSA)
     assert response.status_code == 200

@@ -27,11 +27,19 @@ jobs:
       # List what `COPY . .` put in the image. The contents of `.git` and `__pycache__` are hidden.
       - name: Show the files in the image
         run: docker run --rm "$IMAGE:$GITHUB_SHA" find . \( -name .git -o -name __pycache__ \) -prune -print -o -print
-      # TODO (Task 2): log in to the registry, tag the image with the branch name, and push both tags.
+      - name: Log in to the registry
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+      - name: Push the image
+        run: |
+          BRANCH_TAG="${GITHUB_REF_NAME//\//-}"
+          docker tag "$IMAGE:$GITHUB_SHA" "$IMAGE:$BRANCH_TAG"
+          docker push "$IMAGE:$GITHUB_SHA"
+          docker push "$IMAGE:$BRANCH_TAG"
 
-  # TODO (Task 3): train the model with the new image, once it is pushed.
-  # train:
-  #   needs: build
-  #   uses: ./.github/workflows/train-docker.yml
-  #   with:
-  #     image_tag: ${{ github.sha }}
+  train:
+    needs: build
+    uses: ./.github/workflows/train-docker.yml
+    with:
+      image_tag: ${{ github.sha }}
